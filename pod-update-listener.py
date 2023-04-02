@@ -9,6 +9,7 @@ last_image_ids = {}
 
 def main():
     config.load_incluster_config()
+    # config.load_kube_config() //local
     v1 = client.CoreV1Api()
     namespace = "default"
     pods_to_watch = ["ses-demo", "pv-service", "ses-front-end", "solar-array-store", "user-store"]
@@ -21,13 +22,21 @@ def main():
             sys.stdout.flush()
             if any(pod_name in event['object'].metadata.name for pod_name in pods_to_watch):
               pod_name = event['object'].metadata.name
+              print(f"in here with pod name: {pod_name}")
               if event['type'] == "MODIFIED" and event['object'].status.container_statuses:
+                  print(f"in here with event type: {event['type']}")
+                  print(f"in here with event status: {event['object'].status.container_statuses}")
                   for container_status in event['object'].status.container_statuses:
                       container_name = container_status.name
                       current_image_id = container_status.image_id
+                      print(f"container_status.ready: {container_status.ready}")
+                      print(f"container status image id: {container_status.image_id}")
+                      print(f"current image id: {current_image_id}")
                       
-                      if container_status.ready and container_status.image == current_image_id:
+                      if container_status.ready and container_status.image_id == current_image_id:
                           last_image_id = last_image_ids.get(f"{pod_name}-{container_name}")
+                          print(f"in here ... READY last image id: {last_image_id}")
+                          print(f"in here ... READY current image id: {current_image_id}")
                           
                           if last_image_id is None or last_image_id != current_image_id:
                               last_image_ids[f"{pod_name}-{container_name}"] = current_image_id
