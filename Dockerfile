@@ -4,4 +4,4 @@ RUN pip install kubernetes requests
 
 COPY pod-update-listener.py /app/
 
-CMD ["python", "/app/update_listener.py"]
+CMD ["python", "/app/pod-update-listener.py"]
