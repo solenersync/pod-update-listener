@@ -2,6 +2,7 @@ import os
 import json
 import requests
 from kubernetes import client, config, watch
+import time
 
 last_image_ids = {}
 
@@ -11,22 +12,27 @@ def main():
     namespace = "default"
     pods_to_watch = ["ses-demo", "pv-service", "ses-front-end", "solar-array-store", "user-store"]
 
-    w = watch.Watch()
-    for event in w.stream(v1.list_namespaced_pod, namespace):
-        print(event['object'].metadata.name)
-        if event['object'].metadata.name in pods_to_watch:
-          pod_name = event['object'].metadata.name
-          if event['type'] == "MODIFIED" and event['object'].status.container_statuses:
-              for container_status in event['object'].status.container_statuses:
-                  container_name = container_status.name
-                  current_image_id = container_status.image_id
-                  
-                  if container_status.ready and container_status.image == current_image_id:
-                      last_image_id = last_image_ids.get(f"{pod_name}-{container_name}")
+    while True:
+      try:
+        w = watch.Watch()
+        for event in w.stream(v1.list_namespaced_pod, namespace):
+            print(event['object'].metadata.name)
+            if event['object'].metadata.name in pods_to_watch:
+              pod_name = event['object'].metadata.name
+              if event['type'] == "MODIFIED" and event['object'].status.container_statuses:
+                  for container_status in event['object'].status.container_statuses:
+                      container_name = container_status.name
+                      current_image_id = container_status.image_id
                       
-                      if last_image_id is None or last_image_id != current_image_id:
-                          last_image_ids[f"{pod_name}-{container_name}"] = current_image_id
-                          trigger_github_actions_workflow()
+                      if container_status.ready and container_status.image == current_image_id:
+                          last_image_id = last_image_ids.get(f"{pod_name}-{container_name}")
+                          
+                          if last_image_id is None or last_image_id != current_image_id:
+                              last_image_ids[f"{pod_name}-{container_name}"] = current_image_id
+                              trigger_github_actions_workflow()
+      except Exception as e:
+        print(f"Stream closed with error: {e}")
+        time.sleep(5)  # Wait for 5 seconds before restarting the watch stream
 
 def trigger_github_actions_workflow():
     GITHUB_REPO = os.environ['GITHUB_REPO']
