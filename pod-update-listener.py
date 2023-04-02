@@ -13,6 +13,7 @@ def main():
 
     w = watch.Watch()
     for event in w.stream(v1.list_namespaced_pod, namespace):
+        print(event['object'].metadata.name)
         if event['object'].metadata.name in pods_to_watch:
           pod_name = event['object'].metadata.name
           if event['type'] == "MODIFIED" and event['object'].status.container_statuses:
