@@ -3,18 +3,27 @@ import json
 import requests
 from kubernetes import client, config, watch
 
+last_image_ids = {}
+
 def main():
     config.load_incluster_config()
     v1 = client.CoreV1Api()
-    namespace = "default" 
+    namespace = "default"
 
     w = watch.Watch()
     for event in w.stream(v1.list_namespaced_pod, namespace):
+        pod_name = event['object'].metadata.name
         if event['type'] == "MODIFIED" and event['object'].status.container_statuses:
             for container_status in event['object'].status.container_statuses:
-                if container_status.image != container_status.image_id:
-                    trigger_github_actions_workflow()
-                    break
+                container_name = container_status.name
+                current_image_id = container_status.image_id
+                
+                if container_status.ready and container_status.image == current_image_id:
+                    last_image_id = last_image_ids.get(f"{pod_name}-{container_name}")
+                    
+                    if last_image_id is None or last_image_id != current_image_id:
+                        last_image_ids[f"{pod_name}-{container_name}"] = current_image_id
+                        trigger_github_actions_workflow()
 
 def trigger_github_actions_workflow():
     GITHUB_REPO = os.environ['GITHUB_REPO']
