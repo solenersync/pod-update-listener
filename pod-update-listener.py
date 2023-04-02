@@ -19,7 +19,7 @@ def main():
         for event in w.stream(v1.list_namespaced_pod, namespace):
             print(event['object'].metadata.name)
             sys.stdout.flush()
-            if event['object'].metadata.name in pods_to_watch:
+            if any(pod_name in event['object'].metadata.name for pod_name in pods_to_watch):
               pod_name = event['object'].metadata.name
               if event['type'] == "MODIFIED" and event['object'].status.container_statuses:
                   for container_status in event['object'].status.container_statuses:
@@ -34,6 +34,7 @@ def main():
                               trigger_github_actions_workflow()
       except Exception as e:
         print(f"Stream closed with error: {e}")
+        sys.stdout.flush()
         time.sleep(5)  # Wait for 5 seconds before restarting the watch stream
 
 def trigger_github_actions_workflow():
@@ -55,8 +56,10 @@ def trigger_github_actions_workflow():
     response = requests.post(url, headers=headers, json=payload)
     if response.status_code == 204:
         print("GitHub Actions workflow triggered successfully.")
+        sys.stdout.flush()
     else:
         print(f"Failed to trigger GitHub Actions workflow. Response: {response.text}")
+        sys.stdout.flush()
 
 if __name__ == "__main__":
     main()
