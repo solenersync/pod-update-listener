@@ -4,6 +4,7 @@ import requests
 from kubernetes import client, config, watch
 import time
 import sys
+import re
 
 last_image_ids = {}
 
@@ -32,13 +33,14 @@ def main():
                           
                           if last_image_id is None or last_image_id != current_image_id:
                               last_image_ids[f"{pod_name}-{container_name}"] = current_image_id
-                              trigger_github_actions_workflow()
+                              version_number = extract_version_number(container_status.image)
+                              trigger_github_actions_workflow(container_name, version_number)
       except Exception as e:
         print(f"Stream closed with error: {e}")
         sys.stdout.flush()
         time.sleep(5)  # Wait for 5 seconds before restarting the watch stream
 
-def trigger_github_actions_workflow():
+def trigger_github_actions_workflow(container_name, version_number):
     GITHUB_REPO = os.environ['GITHUB_REPO']
     GITHUB_TOKEN = os.environ['GITHUB_TOKEN']
 
@@ -51,7 +53,10 @@ def trigger_github_actions_workflow():
 
     payload = {
         "event_type": "pod_updated",
-        "client_payload": {}
+        "client_payload": {
+          "container_name": container_name,
+          "version_number": version_number
+        }
     }
 
     response = requests.post(url, headers=headers, json=payload)
@@ -61,6 +66,14 @@ def trigger_github_actions_workflow():
     else:
         print(f"Failed to trigger GitHub Actions workflow. Response: {response.text}")
         sys.stdout.flush()
+
+def extract_version_number(image):
+    version_pattern = r':([\d.]+)$'
+    match = re.search(version_pattern, image)
+    if match:
+        return match.group(1)
+    else:
+        return None
 
 if __name__ == "__main__":
     main()
